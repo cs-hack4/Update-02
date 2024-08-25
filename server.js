@@ -3,7 +3,7 @@ const express = require('express')
 const axios = require('axios')
 
 const SERVER = 2
-const LIVE = 15
+const LIVE = 20
 
 let mActiveServer = []
 let mUpdateServer = {}
