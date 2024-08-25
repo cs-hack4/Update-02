@@ -460,23 +460,21 @@ async function activeAction(id, user, repo, action, storageUrl, cookies) {
                             token = _token
                         }
                     }
-                } else {
-                    if (!body.includes('aria-label="currently running: "') && body.includes('Jump to attempt')) {
-                        let action = await getAction(user, repo, cookies, 1)
-                        if (action == null) {
-                            await newAction(user, repo, cookies)
-                            action = await getAction(user, repo, cookies, 5)
-                        }
-                        if (action) {
-                            token = 'action'
-                            console.log(id, 'Receive New Action: '+action)
-                            console.log(id, 'Success: '+user+'/'+repo)
-                            await saveAction(user, repo, action)
+                } else if (!body.includes('aria-label="currently running: "') && !body.includes('aria-label="queued: "') && body.includes('Jump to attempt')) {
+                    let action = await getAction(user, repo, cookies, 1)
+                    if (action == null) {
+                        await newAction(user, repo, cookies)
+                        action = await getAction(user, repo, cookies, 5)
+                    }
+                    if (action) {
+                        token = 'action'
+                        console.log(id, 'Receive New Action: '+action)
+                        console.log(id, 'Success: '+user+'/'+repo)
+                        await saveAction(user, repo, action)
 
-                            delete mUpdateServer[repo]
-                        } else {
-                            console.log(id, 'Action Null: '+user+'/'+repo)
-                        }
+                        delete mUpdateServer[repo]
+                    } else {
+                        console.log(id, 'Action Null: '+user+'/'+repo)
                     }
                 }
 
@@ -514,7 +512,10 @@ async function activeAction(id, user, repo, action, storageUrl, cookies) {
                         console.log(id, 'Error: '+user+'/'+repo)
                     }
                 }
-            } else if (body.includes('aria-label="currently running: "')) {
+            } else if (body.includes('aria-label="currently running: "') || body.includes('aria-label="queued: "')) {
+                token = 'runing'
+                console.log(id, 'Runing: '+user+'/'+repo)
+
                 try {
                     await axios.post(storageUrl, '', {
                         headers: {
@@ -621,6 +622,11 @@ async function getAction(user, repo, cookies, loop) {
 
             if (body.includes('aria-label="currently running: "')) {
                 let temp = body.substring(0, body.indexOf('aria-label="currently running: "'))
+                temp = temp.substring(temp.lastIndexOf('Box-row js-socket-channel js-updatable-content'))
+                temp = temp.substring(temp.indexOf('/actions/runs/'))
+                action = temp.substring(14, temp.indexOf('"'))
+            } else if (body.includes('aria-label="queued: "')) {
+                let temp = body.substring(0, body.indexOf('aria-label="queued: "'))
                 temp = temp.substring(temp.lastIndexOf('Box-row js-socket-channel js-updatable-content'))
                 temp = temp.substring(temp.indexOf('/actions/runs/'))
                 action = temp.substring(14, temp.indexOf('"'))
