@@ -2,7 +2,7 @@ const FormData = require('form-data')
 const express = require('express')
 const axios = require('axios')
 
-const SERVER = 1
+const SERVER = 2
 const LIVE = 15
 
 let mActiveServer = []
