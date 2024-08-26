@@ -291,15 +291,13 @@ async function updateServer(firstTime) {
         console.log('All:', size, 'Update:', length)
 
         if (length > 0) {
-            let devide = 160000/length
-            
             for (let i = 0; i < length; i++) {
-                updateWebsite(i+1, mList[i], i*devide)
+                updateWebsite(i+1, mList[i], i*8000)
             }
         }
 
         if (size > 0) {
-            let devide = 150000/size
+            let devide = 160000/size
 
             for (let i = 0; i < size; i++) {
                 receiveUpdate(mActiveServer[i], i*devide)
