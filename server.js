@@ -3,7 +3,7 @@ const express = require('express')
 const axios = require('axios')
 
 const SERVER = 2
-const LIVE = 20
+const LIVE = 150
 
 let mActiveServer = []
 let mUpdateServer = {}
@@ -63,7 +63,7 @@ async function startServer() {
     await updateServer(true)
 
     while (true) {
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 3; i++) {
             await delay(60000)
             await updateStatus()
         }
@@ -103,7 +103,7 @@ async function createRepo() {
         if (data != null && data != 'null') {
             let load = 0
             let length = Object.keys(data).length
-            let devide = 200000/length
+            let devide = 150000/length
 
             console.log('Create Repo:', length)
 
@@ -115,7 +115,7 @@ async function createRepo() {
     } catch (error) {}
 
     try {
-        let response = await axios.get(BASE_URL+'github/start.json?orderBy=%22$key%22&limitToFirst=5', { timeout:10000 })
+        let response = await axios.get(BASE_URL+'github/start.json?orderBy=%22active%22&startAt=1&limitToFirst=5', { timeout:10000 })
 
         let data = response.data
 
@@ -133,7 +133,7 @@ async function createRepo() {
 
             let load = 0
             let length = Object.keys(list).length
-            let devide = 200000/length
+            let devide = 150000/length
 
             console.log('Create New Action:', length)
 
@@ -286,12 +286,12 @@ async function updateServer(firstTime) {
 
         let mList = Object.keys(mUpdateServer).sort(function(a,b) { return mUpdateServer[a] - mUpdateServer[b] })
         
-        let length = mList.length > LIVE ? LIVE : mList.length
+        let length = mList.length > 20 ? 20 : mList.length
 
         console.log('All:', size, 'Update:', length)
 
         if (length > 0) {
-            let devide = 280000/length
+            let devide = 160000/length
             
             for (let i = 0; i < length; i++) {
                 updateWebsite(i+1, mList[i], i*devide)
@@ -299,16 +299,16 @@ async function updateServer(firstTime) {
         }
 
         if (size > 0) {
-            let devide = 250000/size
+            let devide = 150000/size
 
             for (let i = 0; i < size; i++) {
                 receiveUpdate(mActiveServer[i], i*devide)
             }
         }
 
-        if (size < LIVE*10) {
+        if (size < LIVE) {
             try {
-                let response = await axios.get(BASE_URL+'github/panding.json?orderBy=%22$key%22&limitToFirst='+((LIVE*10)-size), { timeout:10000 })
+                let response = await axios.get(BASE_URL+'github/panding.json?orderBy=%22$key%22&limitToFirst='+(LIVE-size), { timeout:10000 })
 
                 let data = response.data
 
@@ -373,14 +373,7 @@ async function updateWebsite(id, repo, timeout) {
                 data = response.data
 
                 if(data != null && data != 'null') {
-                    let cookies = 'user_session='+data['cookies']+'; __Host-user_session_same_site='+data['cookies']+'; has_recent_activity=1; logged_in=yes; preferred_color_mode=dark;'
-        
-                    let cancel = await activeAction(id, user, repo, action, storageUrl, cookies)
-        
-                    if (cancel) {
-                        await delay(15000)
-                        await activeAction(id, user, repo, data['action'], storageUrl, cookies)
-                    }
+                    await activeAction(id, user, repo, action, storageUrl, 'user_session='+data['cookies']+'; __Host-user_session_same_site='+data['cookies']+'; has_recent_activity=1; logged_in=yes; preferred_color_mode=dark;')
                 } else {
                     console.log(id, 'User Not Found: '+user)
                     await axios.delete(storageUrl, { timeout:10000 })
@@ -406,117 +399,60 @@ async function activeAction(id, user, repo, action, storageUrl, cookies) {
 
         let body = response.data
 
-        if (body.includes('hx_dot-fill-pending-icon') && body.includes('class="d-inline-block"')) {
-            try {
-                await axios.get('https://raw.githubusercontent.com/'+user+'/'+repo+'/main/.github/workflows/main.yml', { timeout:10000 })
-            } catch (error) {
-                try {
-                    if (error.response.data == '404: Not Found') {
-                        next = false
-                        await axios.delete(storageUrl, { timeout:10000 })
-                    }
-                } catch (error) {}
-            }
-
-            if (next) {
-                body = body.substring(body.indexOf('class="d-inline-block"'), body.length)
-                let form = body.substring(0, body.indexOf('</form>'))
-                let url = form.substring(form.indexOf('action'), form.length)
-                url = url.substring(url.indexOf('"')+1, url.length)
-                url = url.substring(0, url.indexOf('"'))
-                let auth = form.substring(form.indexOf('authenticity_token'), form.length)
-                auth = auth.substring(auth.indexOf('value'), auth.length)
-                auth = auth.substring(auth.indexOf('"')+1, auth.length)
-                auth = auth.substring(0, auth.indexOf('"'))
-
-                if (url && auth && auth.length > 10) {
-                    await axios.post('https://github.com'+url,
-                        new URLSearchParams({
-                        '_method': 'put',
-                        'authenticity_token': auth
-                        }),
-                        {
-                            headers: getGrapHeader(cookies),
-                            maxRedirects: 0,
-                            validateStatus: null,
-                            timeout:10000
-                        })
-
-                    return true
-                }
-            }
-        } else {
-            if (body.includes('Failure') || body.includes('Cancelled') || body.includes('Success')) {
-                if (body.includes('rerequest_check_suite') && body.includes('id="rerun-dialog-mobile-all"')) {
-                    body = body.substring(body.indexOf('id="rerun-dialog-mobile-all"'), body.length)
-                    body = body.substring(0, body.indexOf('</dialog>'))
-                    body = body.substring(body.indexOf('rerequest_check_suite'), body.length)
-                    
-                    let name = 'name="authenticity_token"'
-                    if (body.includes(name)) {
-                        let index = body.indexOf(name)+name.length
-                        let _token = body.substring(index, index+200).split('"')[1]
-                        if (_token && _token.length > 10) {
-                            token = _token
-                        }
-                    }
-                } else if (!body.includes('aria-label="currently running: "') && !body.includes('aria-label="queued: "') && body.includes('Jump to attempt')) {
-                    let action = await getAction(user, repo, cookies, 1)
-                    if (action == null) {
-                        await newAction(user, repo, cookies)
-                        action = await getAction(user, repo, cookies, 5)
-                    }
-                    if (action) {
-                        token = 'action'
-                        console.log(id, 'Receive New Action: '+action)
-                        console.log(id, 'Success: '+user+'/'+repo)
-                        await saveAction(user, repo, action)
-
-                        delete mUpdateServer[repo]
-                    } else {
-                        console.log(id, 'Action Null: '+user+'/'+repo)
+        if (body.includes('Failure') || body.includes('Cancelled') || body.includes('Success')) {
+            if (body.includes('rerequest_check_suite') && body.includes('id="rerun-dialog-mobile-all"')) {
+                body = body.substring(body.indexOf('id="rerun-dialog-mobile-all"'), body.length)
+                body = body.substring(0, body.indexOf('</dialog>'))
+                body = body.substring(body.indexOf('rerequest_check_suite'), body.length)
+                
+                let name = 'name="authenticity_token"'
+                if (body.includes(name)) {
+                    let index = body.indexOf(name)+name.length
+                    let _token = body.substring(index, index+200).split('"')[1]
+                    if (_token && _token.length > 10) {
+                        token = _token
                     }
                 }
+            } else if (!body.includes('aria-label="currently running: "') && !body.includes('aria-label="queued: "') && body.includes('Jump to attempt')) {
+                let action = await getAction(user, repo, cookies, 1)
+                if (action == null) {
+                    await newAction(user, repo, cookies)
+                    action = await getAction(user, repo, cookies, 5)
+                }
+                if (action) {
+                    token = 'action'
+                    console.log(id, 'Receive New Action: '+action)
+                    console.log(id, 'Success: '+user+'/'+repo)
+                    await saveAction(user, repo, action)
 
-                if (token && token != 'action') {
-                    let response = await axios.post('https://github.com/'+user+'/'+repo+'/actions/runs/'+action+'/rerequest_check_suite',
-                        new URLSearchParams({
-                            '_method': 'put',
-                            'authenticity_token': token
-                        }),
-                    {
-                        headers: getGrapHeader(cookies),
-                        maxRedirects: 0,
-                        validateStatus: null,
-                        timeout:10000
-                    })
-    
                     delete mUpdateServer[repo]
-            
-                    try {
-                        if (response.data.length > 0) {
-                            console.log(id, 'Block: '+user+'/'+repo)
-                        } else {
-                            console.log(id, 'Success: '+user+'/'+repo)
-                        }
-            
-                        await axios.post(storageUrl, '', {
-                            headers: {
-                                'Content-Type':'active/'+(parseInt(new Date().getTime()/1000)+200)
-                            },
-                            maxBodyLength: Infinity,
-                            maxContentLength: Infinity,
-                            timeout:10000
-                        })
-                    } catch (error) {
-                        console.log(id, 'Error: '+user+'/'+repo)
-                    }
+                } else {
+                    console.log(id, 'Action Null: '+user+'/'+repo)
                 }
-            } else if (body.includes('aria-label="currently running: "') || body.includes('aria-label="queued: "')) {
-                token = 'runing'
-                console.log(id, 'Runing: '+user+'/'+repo)
+            }
 
+            if (token && token != 'action') {
+                let response = await axios.post('https://github.com/'+user+'/'+repo+'/actions/runs/'+action+'/rerequest_check_suite',
+                    new URLSearchParams({
+                        '_method': 'put',
+                        'authenticity_token': token
+                    }),
+                {
+                    headers: getGrapHeader(cookies),
+                    maxRedirects: 0,
+                    validateStatus: null,
+                    timeout:10000
+                })
+
+                delete mUpdateServer[repo]
+        
                 try {
+                    if (response.data.length > 0) {
+                        console.log(id, 'Block: '+user+'/'+repo)
+                    } else {
+                        console.log(id, 'Success: '+user+'/'+repo)
+                    }
+        
                     await axios.post(storageUrl, '', {
                         headers: {
                             'Content-Type':'active/'+(parseInt(new Date().getTime()/1000)+200)
@@ -525,10 +461,31 @@ async function activeAction(id, user, repo, action, storageUrl, cookies) {
                         maxContentLength: Infinity,
                         timeout:10000
                     })
-                } catch (error) {}
-                
-                delete mUpdateServer[repo]
+                } catch (error) {
+                    console.log(id, 'Error: '+user+'/'+repo)
+                }
             }
+        } else if (body.includes('aria-label="currently running: "') || body.includes('aria-label="queued: "')) {
+            token = 'runing'
+
+            if (body.includes('aria-label="queued: "')) {
+                console.log(id, 'Panding: '+user+'/'+repo)
+            } else {
+                console.log(id, 'Runing: '+user+'/'+repo)
+            }
+
+            try {
+                await axios.post(storageUrl, '', {
+                    headers: {
+                        'Content-Type':'active/'+(parseInt(new Date().getTime()/1000)+200)
+                    },
+                    maxBodyLength: Infinity,
+                    maxContentLength: Infinity,
+                    timeout:10000
+                })
+            } catch (error) {}
+            
+            delete mUpdateServer[repo]
         }
     } catch (error) {}
 
@@ -560,8 +517,6 @@ async function activeAction(id, user, repo, action, storageUrl, cookies) {
             } catch (error) {}
         }
     }
-
-    return false
 }
 
 async function newAction(user, repo, cookies) {
