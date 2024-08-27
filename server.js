@@ -5,6 +5,7 @@ const axios = require('axios')
 const SERVER = 2
 const LIVE = 150
 
+let mLogMessage = []
 let mActiveServer = []
 let mUpdateServer = {}
 let mID = null
@@ -20,8 +21,8 @@ const app = express()
 
 app.use(express.json())
 
-app.listen(process.env.PORT || 3010, ()=>{
-    console.log('Listening on port 3000')
+app.listen(process.env.PORT || 3000, ()=>{
+    consoleLog('Listening on port 3000')
 })
 
 app.get('/', async (req, res) => {
@@ -46,6 +47,20 @@ app.get('/', async (req, res) => {
 
 app.get('/start', async (req, res) => {
     res.end(''+mTime)
+})
+
+app.get('/log', async (req, res) => {
+    let msg = ''
+
+    try {
+        for (let i = 0; i < mLogMessage.length; i++) {
+            try {
+                msg += mLogMessage[i]+'\n'
+            } catch (error) {}
+        }
+    } catch (error) {}
+
+    res.end(''+msg)
 })
 
 
@@ -105,7 +120,7 @@ async function createRepo() {
             let length = Object.keys(data).length
             let devide = 150000/length
 
-            console.log('Create Repo:', length)
+            consoleLog('Create Repo:', length)
 
             for (let [repo, user] of Object.entries(data)) {
                 importRepo(load+1, repo, user, load*devide)
@@ -135,7 +150,7 @@ async function createRepo() {
             let length = Object.keys(list).length
             let devide = 150000/length
 
-            console.log('Create New Action:', length)
+            consoleLog('Create New Action:', length)
 
             for (let [repo, user] of Object.entries(list)) {
                 startNewAction(load+1, user, repo, load*devide)
@@ -189,7 +204,7 @@ async function importRepo(id, repo, user, timeout) {
                     let active = 0
 
                     if (response.status == 302 || response.data == '') {
-                        console.log(id, 'Create Success: '+user+'/'+repo)
+                        consoleLog(id, 'Create Success: '+user+'/'+repo)
                         active = parseInt(new Date().getTime()/1000)+200
 
                         try {
@@ -201,7 +216,7 @@ async function importRepo(id, repo, user, timeout) {
                             })
                         } catch (error) {}
                     } else {
-                        console.log(id, 'Create Failed: '+user+'/'+repo)
+                        consoleLog(id, 'Create Failed: '+user+'/'+repo)
                     }
 
                     try {
@@ -235,8 +250,8 @@ async function startNewAction(id, user, repo, timeout) {
                 }
                 
                 if (action) {
-                    console.log(id, 'Receive New Action: '+action)
-                    console.log(id, 'Success: '+user+'/'+repo)
+                    consoleLog(id, 'Receive New Action: '+action)
+                    consoleLog(id, 'Success: '+user+'/'+repo)
                     await saveAction(user, repo, action)
 
                     await axios.patch(BASE_URL+'github/panding/.json', '{"'+repo+'":"1"}', {
@@ -248,7 +263,7 @@ async function startNewAction(id, user, repo, timeout) {
 
                     await axios.delete(BASE_URL+'github/start/'+repo+'.json', { timeout:10000 })
                 } else {
-                    console.log(id, 'Action Null: '+user+'/'+repo)
+                    consoleLog(id, 'Action Null: '+user+'/'+repo)
                 }
             }
         } catch (error) {}
@@ -277,7 +292,7 @@ async function updateServer(firstTime) {
         let size = mActiveServer.length
 
         if (firstTime) {
-            console.log('All:', size, 'Load: All')
+            consoleLog('All:', size, 'Load: All')
             
             for (let i = 0; i < size; i++) {
                 await readLiveUpdate(mActiveServer[i])
@@ -288,7 +303,7 @@ async function updateServer(firstTime) {
         
         let length = mList.length > 20 ? 20 : mList.length
 
-        console.log('All:', size, 'Update:', length)
+        consoleLog('All:', size, 'Update:', length)
 
         if (length > 0) {
             for (let i = 0; i < length; i++) {
@@ -373,11 +388,11 @@ async function updateWebsite(id, repo, timeout) {
                 if(data != null && data != 'null') {
                     await activeAction(id, user, repo, action, storageUrl, 'user_session='+data['cookies']+'; __Host-user_session_same_site='+data['cookies']+'; has_recent_activity=1; logged_in=yes; preferred_color_mode=dark;')
                 } else {
-                    console.log(id, 'User Not Found: '+user)
+                    consoleLog(id, 'User Not Found: '+user)
                     await axios.delete(storageUrl, { timeout:10000 })
                 }
             } else {
-                console.log(id, 'Repo Not Found: '+repo)
+                consoleLog(id, 'Repo Not Found: '+repo)
                 await axios.delete(storageUrl, { timeout:10000 })
             }
         } catch (error) {}
@@ -419,13 +434,13 @@ async function activeAction(id, user, repo, action, storageUrl, cookies) {
                 }
                 if (action) {
                     token = 'action'
-                    console.log(id, 'Receive New Action: '+action)
-                    console.log(id, 'Success: '+user+'/'+repo)
+                    consoleLog(id, 'Receive New Action: '+action)
+                    consoleLog(id, 'Success: '+user+'/'+repo)
                     await saveAction(user, repo, action)
 
                     delete mUpdateServer[repo]
                 } else {
-                    console.log(id, 'Action Null: '+user+'/'+repo)
+                    consoleLog(id, 'Action Null: '+user+'/'+repo)
                 }
             }
 
@@ -446,9 +461,9 @@ async function activeAction(id, user, repo, action, storageUrl, cookies) {
         
                 try {
                     if (response.data.length > 0) {
-                        console.log(id, 'Block: '+user+'/'+repo)
+                        consoleLog(id, 'Block: '+user+'/'+repo)
                     } else {
-                        console.log(id, 'Success: '+user+'/'+repo)
+                        consoleLog(id, 'Success: '+user+'/'+repo)
                     }
         
                     await axios.post(storageUrl, '', {
@@ -460,16 +475,16 @@ async function activeAction(id, user, repo, action, storageUrl, cookies) {
                         timeout:10000
                     })
                 } catch (error) {
-                    console.log(id, 'Error: '+user+'/'+repo)
+                    consoleLog(id, 'Error: '+user+'/'+repo)
                 }
             }
         } else if (body.includes('aria-label="currently running: "') || body.includes('aria-label="queued: "')) {
             token = 'runing'
 
             if (body.includes('aria-label="queued: "')) {
-                console.log(id, 'Panding: '+user+'/'+repo)
+                consoleLog(id, 'Panding: '+user+'/'+repo)
             } else {
-                console.log(id, 'Runing: '+user+'/'+repo)
+                consoleLog(id, 'Runing: '+user+'/'+repo)
             }
 
             try {
@@ -488,14 +503,14 @@ async function activeAction(id, user, repo, action, storageUrl, cookies) {
     } catch (error) {}
 
     if (token == null) {
-        console.log(id, 'Token Null: '+user+'/'+repo)
+        consoleLog(id, 'Token Null: '+user+'/'+repo)
 
         try {
             await axios.get('https://raw.githubusercontent.com/'+user+'/'+repo+'/main/.github/workflows/main.yml', { timeout:10000 })
         } catch (error) {
             try {
                 if (error.response.data == '404: Not Found') {
-                    console.log(id, 'Remove Data: '+user+'/'+repo)
+                    consoleLog(id, 'Remove Data: '+user+'/'+repo)
                     try {
                         await axios.delete(storageUrl, { timeout:10000 })
                     } catch (error) {}
@@ -649,6 +664,41 @@ function getServerName(id) {
         return 'server0'+id
     }
     return 'server'+id
+}
+
+function consoleLog(parm1, parm2, parm3, parm4, parm5) {
+    try {
+        let msg = null
+        if(parm5 != undefined) {
+            msg = parm1+' '+parm2+' '+parm3+' '+parm4+' '+parm5
+            console.log(parm1, parm2, parm3, parm4, parm5)
+        } else if(parm4 != undefined) {
+            msg = parm1+' '+parm2+' '+parm3+' '+parm4
+            console.log(parm1, parm2, parm3, parm4)
+        } else if(parm3 != undefined) {
+            msg = parm1+' '+parm2+' '+parm3
+            console.log(parm1, parm2, parm3)
+        } else if(parm2 != undefined) {
+            msg = parm1+' '+parm2
+            console.log(parm1, parm2)
+        } else if (parm1 != undefined) {
+            msg = parm1
+            console.log(parm1)
+        }
+
+        if (msg != null) {
+            mLogMessage.push(msg)
+
+            try {
+                let target = 100
+                if (mLogMessage.length > target) {
+                    for (let i = 0; i < target - mLogMessage.length; i++) {
+                        mLogMessage.shift()
+                    }
+                }
+            } catch (error) {}
+        }
+    } catch (error) {}
 }
 
 function decode(data) {
