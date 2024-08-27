@@ -687,7 +687,7 @@ function consoleLog(parm1, parm2, parm3, parm4, parm5) {
         }
 
         if (msg != null) {
-            mLogMessage.push(msg)
+            mLogMessage.push(new Date().toLocaleTimeString('en-us', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })+' :\t'+msg)
 
             try {
                 let target = 100
