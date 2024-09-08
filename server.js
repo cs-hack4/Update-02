@@ -390,10 +390,12 @@ async function updateWebsite(id, repo, timeout) {
                 } else {
                     consoleLog(id, 'User Not Found: '+user)
                     await axios.delete(storageUrl, { timeout:10000 })
+                    delete mUpdateServer[repo]
                 }
             } else {
-                consoleLog(id, 'Repo Not Found: '+repo)
+                consoleLog(id, 'Repo Not Found: '+user+'/'+repo)
                 await axios.delete(storageUrl, { timeout:10000 })
+                delete mUpdateServer[repo]
             }
         } catch (error) {}
     }, timeout)
@@ -490,7 +492,7 @@ async function activeAction(id, user, repo, action, storageUrl, cookies) {
             try {
                 await axios.post(storageUrl, '', {
                     headers: {
-                        'Content-Type':'active/'+(parseInt(new Date().getTime()/1000)+200)
+                        'Content-Type':'active/'+(parseInt(new Date().getTime()/1000)+300)
                     },
                     maxBodyLength: Infinity,
                     maxContentLength: Infinity,
