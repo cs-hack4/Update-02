@@ -98,18 +98,18 @@ async function startServer() {
         await createRepo()
     }
 
-    await updateServer(true)
+    //await updateServer(true)
 
     while (true) {
         for (let i = 0; i < 3; i++) {
             await delay(60000)
             await updateStatus()
         }
-        await updateServer(false)
-        if (SERVER == 1) {
-            await updateRender()
-            await createRepo()
-        }
+        //await updateServer(false)
+        //if (SERVER == 1) {
+        //    await updateRender()
+        //    await createRepo()
+        //}
     }
 }
 
