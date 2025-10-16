@@ -163,7 +163,7 @@ async function readLiveUpdate(repo) {
     try {
         let response = await axios.get(STORAGE+encodeURIComponent('server/'+repo+'.json'))
         
-        if (true || parseInt(new Date().getTime()/1000) > parseInt(response.data['contentType'].replace('active/', ''))+10) {
+        if (parseInt(new Date().getTime()/1000) > parseInt(response.data['contentType'].replace('active/', ''))+10) {
             let pervData = mUpdateServer[repo]
 
             if (pervData != null) {
