@@ -163,7 +163,7 @@ async function readLiveUpdate(repo) {
     try {
         let response = await axios.get(STORAGE+encodeURIComponent('server/'+repo+'.json'))
         
-        if (parseInt(new Date().getTime()/1000) > parseInt(response.data['contentType'].replace('active/', ''))+10) {
+        if (true || parseInt(new Date().getTime()/1000) > parseInt(response.data['contentType'].replace('active/', ''))+10) {
             let pervData = mUpdateServer[repo]
 
             if (pervData != null) {
@@ -248,9 +248,27 @@ async function activeAction(id, user, repo, action, storageUrl, token) {
                     })
                 } catch (error) {}
             } catch (error) {
-                console.log(error);
-                
-                consoleLog(id, 'Error: '+user+'/'+repo)
+                try {
+                    if (error.response) {
+                        if (error.response.status === 403 && error.response.data.message.includes('over a month ago')) {
+                            let newId = await runNewAction(user, repo, token)
+                            if (newId) {
+                                await saveAction(user, repo, newId)
+                                consoleLog(id, 'New Action Success: '+user+'/'+repo)
+                            } else {
+                                consoleLog(id, 'New Action Failed: '+user+'/'+repo)
+                            }
+                        } else {
+                            console.log(error)
+                            consoleLog(id, 'Error: '+user+'/'+repo)
+                        }
+                    } else {
+                        console.log(error)
+                        consoleLog(id, 'Error: '+user+'/'+repo)
+                    }
+                } catch (error) {
+                    consoleLog(id, 'Error: '+user+'/'+repo)
+                }
             }
         } else if (body.status == 'queued' || body.status == 'in_progress') {
             if (body.status == 'queued') {
@@ -277,6 +295,68 @@ async function activeAction(id, user, repo, action, storageUrl, token) {
     if (token == null) {
         consoleLog(id, 'Token Null: '+user+'/'+repo)
     }
+}
+
+async function runNewAction(user, repo, token) {
+    try {
+        let oldResp = await axios.get(`https://api.github.com/repos/${user}/${repo}/actions/runs?branch=main&event=workflow_dispatch`, {
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Accept": "application/vnd.github+json"
+            }
+        })
+
+        let oldRuns = oldResp.data.workflow_runs
+        let oldId = oldRuns && oldRuns.length > 0 ? oldRuns[0].id : null
+        let runAttempt = oldRuns && oldRuns.length > 0 ? oldRuns[0].run_attempt : 1
+
+        if (runAttempt < 5) {
+            return oldId
+        }
+
+        await axios.post(`https://api.github.com/repos/${user}/${repo}/actions/workflows/main.yml/dispatches`, { ref: 'main' },  { 
+            headers: {
+                "Authorization": `Bearer ${token}`, 
+                "Accept": "application/vnd.github+json" 
+            }
+        })
+
+        await delay(3000)
+
+        for (let i = 0; i < 5; i++) {
+            await delay(2000)
+
+            let resp = await axios.get(`https://api.github.com/repos/${user}/${repo}/actions/runs?branch=main&event=workflow_dispatch`, {
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Accept": "application/vnd.github+json"
+                }
+            })
+
+            let runs = resp.data.workflow_runs
+            if (runs && runs.length > 0) {
+                let latestId = runs[0].id
+                console.log(latestId, oldId);
+                
+                if (latestId !== oldId) {
+                    return latestId
+                }
+            }
+        }
+    } catch (err) {}
+
+    return null
+}
+
+async function saveAction(user, repo, action) {
+    try {
+        await axios.patch(BASE_URL+'github/action/'+repo+'.json', JSON.stringify({ action:action, user:user }), {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            timeout:10000
+        })
+    } catch (error) {}
 }
 
 function getServerName(id) {
